@@ -22,7 +22,8 @@
 #include "mouse.h"
 #include "./manymouse/manymouse.h"
 
-int32_t xmouse, ymouse; // holds mouse input data (used for gamedrivers)
+int32_t xmouse, ymouse; // holds combined mouse input data (used for gamedrivers)
+int32_t xmouse_device[MOUSE_MAX_DEVICES], ymouse_device[MOUSE_MAX_DEVICES]; // holds mouse input data per device
 
 static POINT mouselock; // center screen X and Y var for mouse
 static ManyMouseEvent event; // hold current mouse event
@@ -56,10 +57,11 @@ void MOUSE_Lock(void)
 }
 //==========================================================================
 // Purpose: update xmouse/ymouse with mouse input
-// Changed Globals: lockmousecounter, xmouse, ymouse, event
+// Changed Globals: lockmousecounter, xmouse, ymouse, xmouse_device, ymouse_device, event
 //==========================================================================
 void MOUSE_Update(const uint16_t tickrate)
 {
+	uint8_t i;
 	if(tickrate > 8) // if game driver tickrate is over 8ms, do not bother limiting SetCursorPos calls
 		SetCursorPos(mouselock.x, mouselock.y); // set mouse position back to lock position
 	else
@@ -69,6 +71,8 @@ void MOUSE_Update(const uint16_t tickrate)
 		lockmousecounter++; // overflow pseudo-counter
 	}
 	xmouse = ymouse = 0; // reset mouse input
+	for(i = 0; i < MOUSE_MAX_DEVICES; i++)
+		xmouse_device[i] = ymouse_device[i] = 0;
 	while(ManyMouse_PollEvent(&event))
 	{
 		if(event.type == MANYMOUSE_EVENT_RELMOTION)
@@ -77,6 +81,13 @@ void MOUSE_Update(const uint16_t tickrate)
 				xmouse += event.value;
 			else
 				ymouse += event.value;
+			if(event.device < MOUSE_MAX_DEVICES)
+			{
+				if(event.item == 0)
+					xmouse_device[event.device] += event.value;
+				else
+					ymouse_device[event.device] += event.value;
+			}
 		}
 	}
 }

@@ -34,6 +34,8 @@
 #define TS2_crosshairy 0x8158995C - 0x815890A0
 // STATIC ADDRESSES BELOW
 #define TS2_playerbase 0x804686CC // playable character pointer
+#define TS2_player1base_coop 0x807FFC28 // first playable character pointer in split-screen coop
+#define TS2_player2base 0x807FFEC8 // second playable character pointer in split-screen coop
 #define TS2_fov 0x8046818C
 #define TS2_yaxislimit 0x804686BC
 #define TS2_mapmakerx 0x803E5DF0
@@ -41,6 +43,8 @@
 
 static uint8_t TS2_Status(void);
 static void TS2_Inject(void);
+static void TS2_InjectPlayer(const uint32_t playerbase, const int32_t xinput, const int32_t yinput, const float looksensitivity, const float crosshairsensitivity, const float fov, const float yaxislimit);
+static uint8_t TS2_IsValidPlayerbase(const uint32_t playerbase);
 
 static const GAMEDRIVER GAMEDRIVER_INTERFACE =
 {
@@ -76,6 +80,8 @@ static void TS2_Inject(void)
 		return;
 	const float looksensitivity = (float)sensitivity / 40.f;
 	const float crosshairsensitivity = ((float)crosshair / 100.f) * looksensitivity;
+	const float fov = MEM_ReadFloat(TS2_fov);
+	const float yaxislimit = MEM_ReadFloat(TS2_yaxislimit);
 	int32_t cursorx = MEM_ReadInt(TS2_mapmakerx), cursory = MEM_ReadInt(TS2_mapmakery);
 	if(cursorx >= MAPMAKERXMIN && cursorx <= MAPMAKERXMAX && cursory >= MAPMAKERYMIN && cursory <= MAPMAKERYMAX) // if in mapmaker mode
 	{
@@ -86,16 +92,32 @@ static void TS2_Inject(void)
 		return;
 	}
 	const uint32_t playerbase = MEM_ReadUInt(TS2_playerbase);
-	if(!playerbase) // if playerbase is invalid
+	const uint32_t player1base_coop = MEM_ReadUInt(TS2_player1base_coop);
+	const uint32_t player2base = MEM_ReadUInt(TS2_player2base);
+	if(!TS2_IsValidPlayerbase(playerbase)) // if playerbase is invalid
+		return;
+	if(TS2_IsValidPlayerbase(player1base_coop) && TS2_IsValidPlayerbase(player2base) && player1base_coop != player2base) // split-screen coop
+	{
+		TS2_InjectPlayer(selectedplayer ? player2base : player1base_coop, xmouse, ymouse, looksensitivity, crosshairsensitivity, fov, yaxislimit);
+	}
+	else
+	{
+		TS2_InjectPlayer(playerbase, xmouse, ymouse, looksensitivity, crosshairsensitivity, fov, yaxislimit);
+	}
+}
+//==========================================================================
+// Purpose: calculate mouse look and inject into a TS2 player structure
+//==========================================================================
+static void TS2_InjectPlayer(const uint32_t playerbase, const int32_t xinput, const int32_t yinput, const float looksensitivity, const float crosshairsensitivity, const float fov, const float yaxislimit)
+{
+	if(xinput == 0 && yinput == 0) // if mouse is idle
 		return;
 	float camx = MEM_ReadFloat(playerbase + TS2_camx);
 	float camy = MEM_ReadFloat(playerbase + TS2_camy);
-	const float fov = MEM_ReadFloat(TS2_fov);
-	const float yaxislimit = MEM_ReadFloat(TS2_yaxislimit);
 	if(camx >= 0 && camx < 360 && camy >= -yaxislimit && camy <= yaxislimit && fov > 3)
 	{
-		camx -= (float)xmouse / 10.f * looksensitivity * (fov / 60.f); // normal calculation method for X
-		camy += (float)(!invertpitch ? -ymouse : ymouse) / 10.f * looksensitivity * (fov / 60.f); // normal calculation method for Y
+		camx -= (float)xinput / 10.f * looksensitivity * (fov / 60.f); // normal calculation method for X
+		camy += (float)(!invertpitch ? -yinput : yinput) / 10.f * looksensitivity * (fov / 60.f); // normal calculation method for Y
 		while(camx < 0)
 			camx += 360;
 		while(camx >= 360)
@@ -107,10 +129,17 @@ static void TS2_Inject(void)
 		{
 			float crosshairx = MEM_ReadFloat(playerbase + TS2_crosshairx); // after camera x and y have been calculated and injected, calculate the crosshair/gun sway
 			float crosshairy = MEM_ReadFloat(playerbase + TS2_crosshairy);
-			crosshairx += (float)xmouse / 80.f * crosshairsensitivity * (fov / 55.f);
-			crosshairy += (float)(!invertpitch ? ymouse : -ymouse) / 80.f * crosshairsensitivity * (fov / 55.f);
+			crosshairx += (float)xinput / 80.f * crosshairsensitivity * (fov / 55.f);
+			crosshairy += (float)(!invertpitch ? yinput : -yinput) / 80.f * crosshairsensitivity * (fov / 55.f);
 			MEM_WriteFloat(playerbase + TS2_crosshairx, ClampFloat(crosshairx, -1.f, 1.f));
 			MEM_WriteFloat(playerbase + TS2_crosshairy, ClampFloat(crosshairy, -1.f, 1.f));
 		}
 	}
+}
+//==========================================================================
+// Purpose: validate a GameCube RAM pointer to a player structure
+//==========================================================================
+static uint8_t TS2_IsValidPlayerbase(const uint32_t playerbase)
+{
+	return (playerbase >= 0x80000000U && playerbase <= 0x817FF000U);
 }

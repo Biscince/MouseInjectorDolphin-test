@@ -1,8 +1,8 @@
-# Mouse Injector for Dolphin 5.0 (ANY VERSION)
+# Mouse Injector for Dolphin 2606
 
-* [MouseInjectorDolphin.exe](https://github.com/bkacjios/MouseInjectorDolphin/releases/download/v0.32/MouseInjectorDolphin.exe)
+An external app that injects cursor input into game memory with added support for version 2606 of Dolphin
 
-A external app that injects cursor input into game memory, with added support for any version of dolphin, both new and old.
+Experimental splitscreen mouse usage but no use case / WIP.
 
 # How to Use
 Follow the quick start guide in the included readme.txt file

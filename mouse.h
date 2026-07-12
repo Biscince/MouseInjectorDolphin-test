@@ -17,7 +17,10 @@
 // You should have received a copy of the GNU General Public License
 // along with this program; if not, visit http://www.gnu.org/licenses/gpl-2.0.html
 //==========================================================================
+#define MOUSE_MAX_DEVICES 8
+
 extern int32_t xmouse, ymouse;
+extern int32_t xmouse_device[MOUSE_MAX_DEVICES], ymouse_device[MOUSE_MAX_DEVICES];
 
 extern uint8_t MOUSE_Init(void);
 extern void MOUSE_Quit(void);

@@ -35,6 +35,8 @@ float MEM_ReadFloat(const uint32_t addr);
 void MEM_WriteInt(const uint32_t addr, int32_t value);
 void MEM_WriteUInt(const uint32_t addr, uint32_t value);
 void MEM_WriteFloat(const uint32_t addr, float value);
+static uint8_t MEM_IsValidRamRegion(const MEMORY_BASIC_INFORMATION *info);
+static uint8_t MEM_HasGameHeader(const PVOID baseaddress);
 static void MEM_ByteSwap32(uint32_t *input);
 
 //==========================================================================
@@ -77,6 +79,7 @@ void MEM_Quit(void)
 uint8_t MEM_FindRamOffset(void)
 {
 	emuoffset = 0;
+	uint64_t fallbackoffset = 0;
 
 	MEMORY_BASIC_INFORMATION info; // store a snapshot of memory information
 
@@ -84,20 +87,27 @@ uint8_t MEM_FindRamOffset(void)
 
 	while (VirtualQueryEx(emuhandle, gamecube_ptr, &info, sizeof(info))) // loop continues until we reach the last possible memory region
 	{
-		gamecube_ptr = info.BaseAddress + info.RegionSize; // update address to next region of memory for loop
+		gamecube_ptr = (PVOID)((uint8_t *)info.BaseAddress + info.RegionSize); // update address to next region of memory for loop
 
-		if (info.RegionSize == 0x2000000 && info.Type == MEM_MAPPED) { // check if the mapped memory region is the size of the maximum gamecube ram address
+		if (MEM_IsValidRamRegion(&info)) { // check if the mapped memory region is the size of the maximum gamecube ram address
 			PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
 			wsinfo.VirtualAddress = info.BaseAddress;
 
 			if (QueryWorkingSetEx(emuhandle, &wsinfo, sizeof(wsinfo))) { // query extended info about the memory page at the current virtual address space
 				if (wsinfo.VirtualAttributes.Valid) { // check if the address space is valid
-					memcpy(&emuoffset, &(info.BaseAddress), sizeof(info.BaseAddress)); // copy the base address location to our emuoffset pointer
-					return (emuoffset != 0x0);
+					if(!fallbackoffset)
+						memcpy(&fallbackoffset, &(info.BaseAddress), sizeof(info.BaseAddress)); // keep old behavior as fallback
+					if(MEM_HasGameHeader(info.BaseAddress))
+					{
+						memcpy(&emuoffset, &(info.BaseAddress), sizeof(info.BaseAddress)); // copy the base address location to our emuoffset pointer
+						return (emuoffset != 0x0);
+					}
 				}
 			}
 		}
 	}
+	emuoffset = fallbackoffset;
+	return (emuoffset != 0x0);
 }
 //==========================================================================
 // Purpose: read int from memory
@@ -170,6 +180,29 @@ void MEM_WriteFloat(const uint32_t addr, float value)
 		return;
 	MEM_ByteSwap32((uint32_t *)&value); // byteswap
 	WriteProcessMemory(emuhandle, (LPVOID)(emuoffset + (addr - 0x80000000)), &value, sizeof(value), NULL);
+}
+//==========================================================================
+// Purpose: return 1 if memory region can contain GameCube RAM
+//==========================================================================
+static uint8_t MEM_IsValidRamRegion(const MEMORY_BASIC_INFORMATION *info)
+{
+	return (info->RegionSize == 0x2000000 && info->State == MEM_COMMIT && info->Type == MEM_MAPPED);
+}
+//==========================================================================
+// Purpose: return 1 if memory region starts with a plausible GameCube disc ID
+//==========================================================================
+static uint8_t MEM_HasGameHeader(const PVOID baseaddress)
+{
+	uint8_t header[8] = {0};
+	if(!ReadProcessMemory(emuhandle, baseaddress, header, sizeof(header), NULL))
+		return 0;
+	return (header[0] >= 'A' && header[0] <= 'Z' &&
+			header[1] >= 'A' && header[1] <= 'Z' &&
+			header[2] >= 'A' && header[2] <= 'Z' &&
+			header[3] >= 'A' && header[3] <= 'P' &&
+			header[4] >= '0' && header[4] <= '9' &&
+			header[5] >= 'A' && header[5] <= 'Z' &&
+			header[6] == 0 && header[7] == 0);
 }
 //==========================================================================
 // Purpose: byteswap input value

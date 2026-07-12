@@ -4,9 +4,9 @@
 #mingw32-make.exe -f makefile to compile
 
 #Compiler directories
-MINGWDIR = C:/MinGW64/bin/
-CC = $(MINGWDIR)gcc
-WINDRES = $(MINGWDIR)windres
+#MINGWDIR = C:/MinGW64/bin/
+CC = x86_64-w64-mingw32-gcc
+WINDRES = x86_64-w64-mingw32-windres
 
 #Source directories
 SRCDIR = ./

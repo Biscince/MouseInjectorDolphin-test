@@ -35,6 +35,7 @@ static uint8_t welcomed = 0;
 uint8_t sensitivity = 20;
 uint8_t crosshair = 3;
 uint8_t invertpitch = 0;
+uint8_t selectedplayer = 0;
 
 int32_t main(void);
 static void quit(void);
@@ -130,7 +131,7 @@ static void GUI_Welcome(void)
 }
 //==========================================================================
 // Purpose: checks keyboard and will update internal values
-// Changed Globals: mousetoggle, selectedoption, invertpitch, sensitivity, crosshair, locksettings
+// Changed Globals: mousetoggle, selectedoption, invertpitch, selectedplayer, sensitivity, crosshair, locksettings
 //==========================================================================
 static void GUI_Interact(void)
 {
@@ -155,6 +156,11 @@ static void GUI_Interact(void)
 	if(K_7 && !locksettings && !updateinterface) // invert pitch toggle (7)
 	{
 		invertpitch = !invertpitch;
+		updateinterface = 1;
+	}
+	if(K_8 && !locksettings && !updateinterface) // player target toggle (8)
+	{
+		selectedplayer = !selectedplayer;
 		updateinterface = 1;
 	}
 	if(K_PLUS && !locksettings && !updateinterface) // numpad plus (+)
@@ -213,7 +219,8 @@ static void GUI_Update(void)
 			printf("Not Available For Game");
 		printf(selectedoption == EDITINGCROSSHAIR ? " [+/-]\n\n" : "\n\n");
 		printf(invertpitch ? "   [7] - [ON] Invert Pitch\n\n" : "   [7] - [OFF] Invert Pitch\n\n");
-		printf("\n\n\n\n\n");
+		printf("   [8] - Mouse Target: Player %u\n\n", selectedplayer + 1);
+		printf("\n\n\n\n");
 		printf("   [CTRL+0] - Lock Settings\n\n");
 	}
 	else
@@ -274,7 +281,7 @@ static void GUI_Clear(void)
 }
 //==========================================================================
 // Purpose: loads settings stored in mouseinjector.ini
-// Changes Globals: sensitivity, crosshair, invertpitch, locksettings, welcomed
+// Changes Globals: sensitivity, crosshair, invertpitch, selectedplayer, locksettings, welcomed
 //==========================================================================
 static void INI_Load(void)
 {
@@ -290,13 +297,15 @@ static void INI_Load(void)
 			counter++; // add 1 to counter, so the next line can be read
 		}
 		fclose(fileptr); // close the file stream
-		if(counter == 5) // check if mouseinjector.ini length is valid
+		if(counter == 5 || counter == 6) // check if mouseinjector.ini length is valid
 		{
 			sensitivity = ClampInt(atoi(line[0]), 1, 200);
 			crosshair = ClampInt(atoi(line[1]), 0, 18);
 			invertpitch = !(!atoi(line[2]));
 			locksettings = !(!atoi(line[3]));
 			welcomed = !(!atoi(line[4]));
+			if(counter == 6)
+				selectedplayer = !(!atoi(line[5]));
 		}
 		else
 		{
@@ -318,7 +327,7 @@ static void INI_Save(const uint8_t showerror)
 	FILE *fileptr; // create a file pointer and open mouseinjector.ini from same dir as our program
 	if((fileptr = fopen("mouseinjector.ini", "w")) != NULL) // if the INI exists
 	{
-		fprintf(fileptr, "%u\n%u\n%u\n%u\n%u", sensitivity, crosshair, invertpitch, locksettings, welcomed); // write current settings to mouseinjector.ini
+		fprintf(fileptr, "%u\n%u\n%u\n%u\n%u\n%u", sensitivity, crosshair, invertpitch, locksettings, welcomed, selectedplayer); // write current settings to mouseinjector.ini
 		fclose(fileptr); // close the file stream
 	}
 	else if(showerror) // if saving file failed
